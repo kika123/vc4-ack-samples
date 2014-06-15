@@ -25,7 +25,7 @@ static void *mapmem(unsigned base, unsigned size)
       0,
       size,
       PROT_READ|PROT_WRITE,
-      MAP_SHARED/*|MAP_FIXED*/,
+      MAP_SHARED,
       mem_fd, 
       base);
 #ifdef DEBUG
@@ -228,7 +228,7 @@ void *printroutine(void *pointer)
 void *flushroutine(void* pointer) {
 	while (1 == 1) {
 		fflush(stdout);
-		sleep(1);
+		sleep(25);
 	}
 }
 /* 
@@ -247,14 +247,14 @@ int main(int argc, char *argv[])
    }
    /* sanity check we care talking to GPU - should match vcgencmd version */
    printf("Version: %d\n", get_version(file_desc));
-   int size = 1024*1024; /* 128 KBytes */
-   unsigned handle[3], buffer[3]; void *user[3];
+   int size = 1024*512; /* 128 KBytes */
+   unsigned handle[2], buffer[2]; void *user[2];
    /* allocate memory on GPU, and use accessible mmapped versions */
    for (i=0; i<sizeof handle/sizeof *handle; i++) {
-      handle[i] = mem_alloc(file_desc, size, 4096, 0x4);
+      handle[i] = mem_alloc(file_desc, size, 4096, 0xc);
       buffer[i] = mem_lock(file_desc, handle[i]);
       printf("handle=%x, buffer=%x\n", handle[i], buffer[i]);
-      user[i] = mapmem(buffer[i]+0x20000000, size);
+      user[i] = mapmem(buffer[i], size);
       memset(user[i], 0x00, size);
    }
    /* load GPU code into one of the buffers. */
@@ -265,13 +265,15 @@ int main(int argc, char *argv[])
 	 pthread_create(&thread,NULL,printroutine,user[1]);  /* Just A Thread */
 	 pthread_create(&dth,NULL,flushroutine,NULL);
    // execute the GPU code:
-	sleep(1);
-   int s = execute_code(file_desc, buffer[0], 0,0, buffer[1], buffer[2], size, 0);
+	usleep(10000);
+   int s = execute_code(file_desc, buffer[0], 0,0, buffer[1], 0, size, 0);
 	puts("GPU Task Finished");
 /*
 	char* ptr = (char*)user[1];
 	putc(ptr[1],stdout);
 */
+	/* printf("Exit flag: %d \n",user[2]); */ /* Original Code */
+	printf("Exit flag: %08x \n", user[1]);
 	 pthread_cancel(thread);  /* Halting It */
 	 pthread_cancel(dth);
    // free up (important - if you don't call mem_free that memory will be lost for good)
